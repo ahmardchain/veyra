@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "./veyra-v2.css";
 
 export const metadata: Metadata = {
   title: "Veyra ClosePrint — What survives Monday?",
