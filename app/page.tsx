@@ -62,6 +62,8 @@ export default function Desk() {
   const [loading, setLoading] = useState(true);
   const [marketError, setMarketError] = useState("");
   const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [aiConnected, setAiConnected] = useState(false);
+  const [useAI, setUseAI] = useState(false);
   const [tab, setTab] = useState("brief");
 
   async function loadMarket(nextSymbol = symbol) {
@@ -105,8 +107,17 @@ export default function Desk() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    fetch("/api/research").then(r => r.json()).then(data => setAiConnected(data.configured === true)).catch(() => setAiConnected(false));
+  }, []);
+
+  function downloadRun() {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(run, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a"); link.href = url; link.download = `veyra-run-${run.completedAt}.json`; link.click(); URL.revokeObjectURL(url);
+  }
+
   const parsedNotional = Number(notional);
-  const inputError = !Number.isFinite(parsedNotional) || parsedNotional <= 0 || parsedNotional > 1_000_000;
+  const inputError = !Number.isFinite(parsedNotional) || parsedNotional < 1 || parsedNotional > 1_000_000;
   const draftChanged = useMemo(() => (
     run.question !== question ||
     run.eventPacket !== eventPacket ||
@@ -116,14 +127,21 @@ export default function Desk() {
     run.snapshot.timestamp !== snapshot.timestamp
   ), [eventPacket, parsedNotional, question, run, side, snapshot]);
 
-  function runClosePrint() {
-    if (inputError || loading || !question.trim() || !eventPacket.trim()) return;
-    setAnalysisRunning(true);
-    setTab("brief");
-    window.setTimeout(() => {
-      setRun(makeRun(snapshot, question.trim(), eventPacket.trim(), side, parsedNotional));
-      setAnalysisRunning(false);
-    }, 420);
+  async function runClosePrint() {
+    if (inputError || loading || analysisRunning || !question.trim() || !eventPacket.trim()) return;
+    setAnalysisRunning(true); setTab("brief");
+    const started = performance.now();
+    const next = makeRun(snapshot, question.trim(), eventPacket.trim(), side, parsedNotional);
+    try {
+      if (useAI && aiConnected) {
+        const response = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: next.question, eventPacket: next.eventPacket, eventSource: next.eventSource, asset: snapshot.asset, side, notional: parsedNotional, context: JSON.stringify({ snapshot, market: next.market }).slice(0, 4000) }) });
+        const raw = await response.text();
+        const data = raw.trim() ? JSON.parse(raw) : { error: "AI review returned an empty response." };
+        if (!response.ok || !data.review) throw new Error(data.error || "AI review unavailable.");
+        next.aiReview = data.review;
+      }
+    } catch (error) { next.aiError = error instanceof Error ? error.message : "AI review unavailable; rule-based brief retained."; }
+    finally { next.durationMs = Math.round(performance.now() - started); setRun(next); setAnalysisRunning(false); }
   }
 
   function resetDemo() {
@@ -144,16 +162,18 @@ export default function Desk() {
   const basisDescription = Math.abs(market.anchorBasisPct) < 0.25
     ? "near the venue anchor"
     : `${signed(market.anchorBasisPct, "%")} versus the venue anchor`;
-  const conclusion = run.posture === "WAIT / VERIFY"
+  const closedConclusion = run.posture === "WAIT / VERIFY"
     ? `Do not treat the current ${run.snapshot.asset} print as confirmed US cash-market price discovery. The requested size faces ${money(market.spreadBps)} bps spread, ${money(market.impactBps)} bps estimated impact, and is ${basisDescription}. Verify the event against its primary source and reassess when the cash market reopens.`
     : run.posture === "CONDITIONAL / SIZE DOWN"
       ? `The visible book can absorb the request, but the cost of immediacy is material. Treat the weekend move as provisional, reduce the test size, and use the cash open as confirmation rather than assuming the current print survives Monday.`
       : `The requested size fits the visible book with limited modeled impact. The remaining risk is informational: the current rToken print can still re-anchor when the US cash market opens.`;
 
+  const conclusion = run.snapshot.session === "closed" ? closedConclusion : `US cash is open. This venue snapshot has ${money(market.spreadBps)} bps spread and ${money(market.impactBps)} bps modeled impact for the requested size. The prior venue anchor is descriptive, not fair value. Verify the event and current liquidity before deciding.`;
+
   const trace: ToolCall[] = [
     { id: "event", name: "extract_event_language", status: analysisRunning ? "running" : "success", result: `${eventToneLabel} language read. ${event.expectationGap}` },
     { id: "session", name: "resolve_two_market_clocks", status: analysisRunning ? "running" : "success", result: `US cash is ${run.snapshot.session}; the ${run.snapshot.asset} venue book is evaluated separately from the latest venue anchor.` },
-    { id: "market", name: "read_bitget_public_market", status: run.snapshot.source === "live" ? "success" : "error", result: run.snapshot.source === "live" ? `${run.snapshot.symbol} bid ${money(run.snapshot.bid)}, ask ${money(run.snapshot.ask)} from public Bitget v3 market data.` : "The live request was unavailable. Every fallback market value is labelled illustrative." },
+    { id: "market", name: "read_bitget_public_market", status: run.snapshot.source === "live" ? "success" : "error", result: run.snapshot.source === "live" ? `${run.snapshot.symbol} bid ${money(run.snapshot.bid)}, ask ${money(run.snapshot.ask)} from public Bitget v3 market data.` : "An illustrative book is selected. Every market value is labelled illustrative." },
     { id: "book", name: "price_visible_book", status: analysisRunning ? "running" : "success", result: `${money(market.fillRatio * 100)}% visible fill; ${money(market.spreadBps)} bps spread; ${money(market.impactBps)} bps estimated impact.` },
     { id: "reanchor", name: "model_reanchor_sensitivity", status: analysisRunning ? "running" : "success", result: "Three anchor-relative sensitivity cases are shown as modeled references, not forecasts or historical probabilities." },
   ];
@@ -180,7 +200,7 @@ export default function Desk() {
 
         <section className="workbench" id="workbench" aria-label="Veyra ClosePrint workbench">
           <Card className="input-panel">
-            <div className="section-heading"><span><Terminal size={16} />Research request</span><button type="button" className="text-button" onClick={resetDemo}>Reset demo</button></div>
+            <div className="section-heading"><span><Terminal size={16} />Research request</span><button type="button" className="text-button" onClick={resetDemo} disabled={loading || analysisRunning}>Reset demo</button></div>
             <div className="input-body">
               <div className="field-group"><label className="field-label" htmlFor="research-question">Question</label><Textarea id="research-question" value={question} onChange={(eventValue) => setQuestion(eventValue.target.value)} rows={3} /></div>
               <div className="field-group"><div className="field-line"><label className="field-label" htmlFor="event-packet">Event packet</label><span>{eventPacket.trim() === SEEDED_EVENT ? "Illustrative" : "User supplied"}</span></div><Textarea id="event-packet" value={eventPacket} onChange={(eventValue) => setEventPacket(eventValue.target.value)} rows={5} /><p className="hint">Paste a sourced earnings or news summary. The demo packet is illustrative and never presented as observed evidence.</p></div>
@@ -189,6 +209,8 @@ export default function Desk() {
               {inputError ? <p className="error" role="alert">Use a size from 1 to 1,000,000 USDT.</p> : null}
               {!question.trim() || !eventPacket.trim() ? <p className="error" role="alert">Question and event packet are required.</p> : null}
               <Button className="run-button" onClick={runClosePrint} disabled={inputError || loading || analysisRunning || !question.trim() || !eventPacket.trim()}>{analysisRunning ? "Building ClosePrint…" : "Run ClosePrint"}<ArrowRight size={16} /></Button>
+              <Button variant="outline" disabled={!aiConnected || analysisRunning} aria-pressed={useAI} onClick={() => setUseAI(!useAI)}>{useAI ? "AI review on" : "AI review off"}</Button>
+              <p className="hint">{aiConnected ? "Optional AI review sends this question and packet to the configured model. Turn it on before running." : "Rule engine active. AI review is not connected."} Without AI, the question is context; asset, side and size control the calculation.</p>
               <div className="run-meta"><span><ShieldCheck size={13} />No order route</span>{draftChanged ? <span className="draft-status"><CircleDot size={12} />Draft changed</span> : <span><Check size={13} />Brief current</span>}</div>
             </div>
           </Card>
@@ -197,30 +219,32 @@ export default function Desk() {
             <div className="result-commandbar"><div><span className={`source-pill ${run.snapshot.source}`}>{run.snapshot.source === "live" ? "LIVE BITGET" : "ILLUSTRATIVE BOOK"}</span><span className="timestamp">Snapshot {time(run.snapshot.timestamp)}</span></div><Button variant="outline" size="sm" onClick={() => loadMarket(symbol)} disabled={loading}><RefreshCw size={13} className={loading ? "spin" : ""} />{loading ? "Refreshing" : "Refresh"}</Button></div>
             {marketError ? <p className="stale-note" role="status">{marketError}</p> : null}
             <Tabs value={tab} onValueChange={setTab}>
-              <div className="result-nav"><TabsList><TabsTrigger value="brief">Decision brief</TabsTrigger><TabsTrigger value="book">Book math</TabsTrigger><TabsTrigger value="evidence">Provenance</TabsTrigger></TabsList></div>
+              <div className="result-nav"><Button variant="outline" size="sm" onClick={downloadRun} disabled={analysisRunning}>Download run</Button><TabsList><TabsTrigger value="brief">Decision brief</TabsTrigger><TabsTrigger value="book">Book math</TabsTrigger><TabsTrigger value="evidence">Provenance</TabsTrigger></TabsList></div>
               <TabsContent value="brief">
                 <Card className="memo-card">
                   <div className="memo-head"><div><p className="eyebrow">CLOSEPRINT / {run.snapshot.asset}</p><div className="posture">{run.posture}</div></div><div className={`session-badge ${run.snapshot.session}`}><span />US cash {run.snapshot.session}</div></div>
                   <div className="insight-block"><span>ACTIONABLE INSIGHT</span><p>{conclusion}</p></div>
+                  {run.aiError ? <p className="stale-note" role="status">{run.aiError}</p> : null}
+                  {run.aiReview ? <section className="insight-block"><span>AI REVIEW / {run.aiReview.model}</span><p>{run.aiReview.answer}</p><p>Expectation gap: {run.aiReview.expectationGap}</p><p>Counter-signal: {run.aiReview.counterSignal}</p><p>Invalidation: {run.aiReview.invalidation}</p>{run.aiReview.evidence.map((item, i) => <p key={i}>“{item.quote}” — {item.interpretation}</p>)}<small>Quotes matched to the supplied packet; interpretation is not external fact verification.</small></section> : null}
                   <div className="memo-grid">
                     <section className="memo-section"><div className="memo-section-title"><span>01</span><h2>Event read</h2><small>{eventToneLabel}</small></div><dl className="memo-list"><div><dt>Headline</dt><dd>{event.headline}</dd></div><div><dt>Gap</dt><dd>{event.expectationGap}</dd></div><div><dt>Counter</dt><dd>{event.counterSignal}</dd></div></dl></section>
                     <section className="memo-section"><div className="memo-section-title"><span>02</span><h2>Two market clocks</h2><small>SESSION MODEL</small></div><div className="clock-pair"><div><span>US cash reference</span><strong>{run.snapshot.session === "closed" ? "CLOSED / ANCHORED" : "OPEN"}</strong><small>{money(run.snapshot.anchor)} venue anchor</small></div><div><span>{run.snapshot.asset} book</span><strong>{run.snapshot.source === "live" ? "LIVE" : "ILLUSTRATIVE"}</strong><small>{money(market.mid)} current mid</small></div></div></section>
-                    <section className="memo-section memo-section-wide"><div className="memo-section-title"><span>03</span><h2>Cost of immediacy</h2><small>DETERMINISTIC</small></div><div className="metric-grid"><div><span>Book vs anchor</span><strong>{signed(market.anchorBasisPct, "%")}</strong><small>already reflected</small></div><div><span>Quoted spread</span><strong>{money(market.spreadBps)} bps</strong><small>bid to ask</small></div><div><span>Estimated impact</span><strong>{money(market.impactBps)} bps</strong><small>{money(market.fillRatio * 100)}% visible fill</small></div></div></section>
-                    <section className="memo-section memo-section-wide"><div className="memo-section-title"><span>04</span><h2>Monday sensitivity</h2><small>MODELED · NOT HISTORY</small></div><div className="scenario-row">{market.scenarios.map((scenario) => <div key={scenario.move}><span>{signed(scenario.move, "%")} anchor case</span><strong>{money(scenario.price)}</strong><small>{signed(scenario.versusNow)} vs estimated fill</small></div>)}</div><p className="boundary-note">No historical probability is claimed. These cases simply expose how the current estimated fill compares with a lower, flat, or higher cash-market re-anchor.</p></section>
-                    <section className="memo-section memo-section-wide invalidation"><div className="memo-section-title"><span>05</span><h2>What changes the conclusion</h2><small>INVALIDATION</small></div><p>A primary-source event packet with a verified consensus baseline, a materially tighter visible book, or a US cash open that confirms the weekend move.</p></section>
+                    <section className="memo-section memo-section-wide"><div className="memo-section-title"><span>03</span><h2>Cost of immediacy</h2><small>DETERMINISTIC</small></div><div className="metric-grid"><div><span>Book vs anchor</span><strong>{signed(market.anchorBasisPct, "%")}</strong><small>descriptive difference</small></div><div><span>Quoted spread</span><strong>{money(market.spreadBps)} bps</strong><small>bid to ask</small></div><div><span>Estimated impact</span><strong>{money(market.impactBps)} bps</strong><small>{money(market.fillRatio * 100)}% visible fill</small></div></div></section>
+                    <section className="memo-section memo-section-wide"><div className="memo-section-title"><span>04</span><h2>Anchor sensitivity</h2><small>MODELED · NOT HISTORY</small></div><div className="scenario-row">{market.scenarios.map((scenario) => <div key={scenario.move}><span>{signed(scenario.move, "%")} anchor case</span><strong>{money(scenario.price)}</strong><small>{signed(scenario.versusNow)} vs estimated fill</small></div>)}</div><p className="boundary-note">No historical probability is claimed. These cases simply expose how the current estimated fill compares with a lower, flat, or higher cash-market re-anchor.</p></section>
+                    <section className="memo-section memo-section-wide invalidation"><div className="memo-section-title"><span>05</span><h2>What changes the conclusion</h2><small>INVALIDATION</small></div><p>A primary-source event packet with a verified consensus baseline, a materially tighter visible book, or independent cash-market evidence that changes the thesis.</p></section>
                   </div>
                   <div className="human-gate"><ShieldCheck size={16} /><div><strong>Human decision required</strong><span>Veyra exposes evidence and constraints. It cannot place an order.</span></div></div>
                 </Card>
               </TabsContent>
               <TabsContent value="book"><Card className="book-card"><div className="book-summary"><div><span>Requested</span><strong>{money(run.notional)} USDT</strong></div><div><span>Estimated average</span><strong>{money(market.averageFill)}</strong></div><div><span>Visible book cost</span><strong>{money(market.estimatedBookCost)} USDT</strong></div></div><div className="table-wrap"><Table><TableHeader><TableRow><TableHead>Level</TableHead><TableHead className="numeric">Price</TableHead><TableHead className="numeric">Quantity used</TableHead><TableHead className="numeric">Notional</TableHead></TableRow></TableHeader><TableBody>{market.fills.map((fill, index) => <TableRow key={`${fill.price}-${index}`}><TableCell className="muted">{String(index + 1).padStart(2, "0")}</TableCell><TableCell className="numeric">{money(fill.price)}</TableCell><TableCell className="numeric">{money(fill.quantity, 4)}</TableCell><TableCell className="numeric">{money(fill.notional)}</TableCell></TableRow>)}</TableBody></Table></div></Card></TabsContent>
-              <TabsContent value="evidence"><Card className="evidence-card"><p className="eyebrow">PROVENANCE / BOUNDARIES</p><h2>Every number says what it is.</h2><dl><dt>Event layer <span>{run.eventSource}</span></dt><dd>{run.eventSource === "illustrative" ? "A seeded demonstration packet. Replace it with a primary-source excerpt before making a live claim." : "Text supplied by the user. Deterministic keyword extraction identifies language; it does not verify the source."}</dd><dt>Market layer <span>{run.snapshot.source}</span></dt><dd>{run.snapshot.source === "live" ? `Public Bitget v3 ticker and visible order book for ${run.snapshot.symbol}, timestamped ${time(run.snapshot.timestamp)}.` : "A fixed illustrative fallback book used only when the public Bitget request is unavailable."}</dd><dt>Anchor layer <span>derived</span></dt><dd>The close of the latest completed 3–4 PM New York hourly rToken candle: {money(run.snapshot.anchor)} at {time(run.snapshot.anchorTimestamp)}. It is a venue anchor, not an official underlying-stock close.</dd><dt>Scenario layer <span>modeled</span></dt><dd>−3%, 0%, and +3% sensitivity around the venue anchor. These are not historical observations, probabilities, or price forecasts.</dd><dt>Current limitations <span>excluded</span></dt><dd>No external LLM, transcript verification, historical analogue database, account balances, hidden liquidity, fees, taxes, issuer redemption, or execution.</dd></dl></Card></TabsContent>
+              <TabsContent value="evidence"><Card className="evidence-card"><p className="eyebrow">PROVENANCE / BOUNDARIES</p><h2>Every number says what it is.</h2><dl><dt>Event layer <span>{run.eventSource}</span></dt><dd>{run.eventSource === "illustrative" ? "A seeded demonstration packet. Replace it with a primary-source excerpt before making a live claim." : "Text supplied by the user. Deterministic keyword extraction identifies language; it does not verify the source."}</dd><dt>Market layer <span>{run.snapshot.source}</span></dt><dd>{run.snapshot.source === "live" ? `Public Bitget v3 ticker and visible order book for ${run.snapshot.symbol}, timestamped ${time(run.snapshot.timestamp)}.` : "A fixed illustrative book selected by Reset demo or used when live data is unavailable."}</dd><dt>Anchor layer <span>derived</span></dt><dd>The close of the latest completed final cash-session hourly rToken candle (including scheduled early closes): {money(run.snapshot.anchor)} at {time(run.snapshot.anchorTimestamp)}. It is a venue anchor, not an official underlying-stock close.</dd><dt>Session calendar <span>scheduled</span></dt><dd>{run.snapshot.sessionBasis || "Illustrative closed-session scenario."}</dd><dt>Scenario layer <span>modeled</span></dt><dd>−3%, 0%, and +3% sensitivity around the venue anchor. These are not historical observations, probabilities, or price forecasts.</dd><dt>Current limitations <span>excluded</span></dt><dd>AI review is optional and shown separately when successful. No transcript verification, historical analogue database, account balances, hidden liquidity, fees, taxes, issuer redemption, or execution.</dd></dl></Card></TabsContent>
             </Tabs>
           </motion.div>
         </section>
 
         <details className="trace-section"><summary>Inspect calculation trace</summary><div className="trace-layout">
           <div className="section-intro"><p className="eyebrow">AUDITABLE RESEARCH RUN</p><h2 id="trace-title">One question. Five visible checks.</h2><p>The workflow stays inspectable: inputs, source status, calculations, boundaries and conclusion remain separate.</p></div>
-          <Card className="trace-card"><div className="trace-head"><span><ScanSearch size={16} />Run trace</span><span className="source-pill rules">RULE ENGINE</span></div><div className="trace-body"><AgentSteps steps={trace} /></div><div className="trace-foot"><CheckCircle2 size={15} /><span>Research object completed</span><small>No external model call required</small></div></Card>
+          <Card className="trace-card"><div className="trace-head"><span><ScanSearch size={16} />Run trace</span><span className="source-pill rules">RULE ENGINE</span></div><div className="trace-body"><AgentSteps steps={trace} /></div><div className="trace-foot"><CheckCircle2 size={15} /><span>Research object completed</span><small>{run.aiReview ? `AI review: ${run.aiReview.model}` : "Rule engine · no AI output"}</small></div></Card>
         </div></details>
 
         <footer><span>VEYRA / CLOSEPRINT DESK</span><span>Observed · derived · modeled · illustrative</span><span>No login. No execution.</span></footer>

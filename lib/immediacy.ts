@@ -5,7 +5,7 @@ export type MarketSnapshot = {
   bidSize: number; askSize: number; change24h: number; turnover24h: number;
   platformTurnover24h: number; timestamp: number; anchor: number;
   anchorTimestamp: number; bids: Level[]; asks: Level[];
-  session: "open" | "closed"; source: "live" | "illustrative";
+  session: "open" | "closed"; source: "live" | "illustrative"; sessionBasis?: string;
 };
 const positive = (value: number) => Number.isFinite(value) && value > 0;
 
@@ -14,7 +14,8 @@ export function priceImmediacy(snapshot: MarketSnapshot, notional: number, side:
   if (![snapshot.bid, snapshot.ask, snapshot.anchor].every(positive)) throw new Error("The market snapshot is missing a valid price.");
   const mid = (snapshot.bid + snapshot.ask) / 2;
   const spreadBps = ((snapshot.ask - snapshot.bid) / mid) * 10_000;
-  const levels = side === "buy" ? snapshot.asks : snapshot.bids;
+  if (snapshot.ask < snapshot.bid) throw new Error("The order book is crossed; refresh the snapshot.");
+  const levels = [...(side === "buy" ? snapshot.asks : snapshot.bids)].filter(([p,q]) => positive(p) && positive(q)).sort((a,b) => side === "buy" ? a[0] - b[0] : b[0] - a[0]);
   let remaining = notional, filledNotional = 0, filledQuantity = 0;
   const fills: Array<{ price: number; quantity: number; notional: number }> = [];
   for (const [price, quantity] of levels) {
@@ -40,10 +41,10 @@ export function priceImmediacy(snapshot: MarketSnapshot, notional: number, side:
   let rationale = "The requested size fits the visible book without a large quoted premium.";
   if (fillRatio < 0.999) {
     posture = "WAIT"; rationale = "The visible book cannot fill the requested size. Waiting or splitting the order avoids blind market impact.";
-  } else if (Math.abs(anchorBasisPct) >= 1.5 || spreadBps >= 25 || impactBps >= 35) {
-    posture = "WAIT"; rationale = "The current quote is expensive relative to the last US-session anchor or the book is too thin for this size.";
-  } else if (Math.abs(anchorBasisPct) >= 0.5 || spreadBps >= 10 || impactBps >= 15 || notional > depth25bps) {
-    posture = "SIZE TEST"; rationale = "The trade is fillable, but the spread, basis, or shallow depth argues for a smaller limit-order test.";
+  } else if (spreadBps >= 25 || impactBps >= 35) {
+    posture = "WAIT"; rationale = "Spread or modeled impact exceeds the desk's illustrative research threshold.";
+  } else if (spreadBps >= 10 || impactBps >= 15 || notional > depth25bps) {
+    posture = "SIZE TEST"; rationale = "The request fits, but spread, impact or shallow depth warrants comparing a smaller size.";
   }
   const scenarios = [-3, 0, 3].map((move) => ({ move, price: snapshot.anchor * (1 + move / 100), versusNow: snapshot.anchor * (1 + move / 100) - averageFill }));
   return { mid, spreadBps, averageFill, filledNotional, fillRatio, impactBps, anchorBasisPct, executionVsAnchorPct, depth25bps, estimatedBookCost, posture, rationale, fills, scenarios };

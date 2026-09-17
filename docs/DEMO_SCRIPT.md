@@ -1,56 +1,39 @@
-# Veyra — 90-second demo script
+# Veyra — recording guide
 
-## Recording setup
+Record a browser screen, not a camera pointed at a laptop. Use a recorder you already have, a 16:9 desktop window, microphone on, notifications off and browser zoom around 90–100%. Keep the final clip under three minutes. No title animation is needed. Record a practice run first; check that every number and provenance label is readable. Export MP4 and upload publicly to YouTube or X; test its link signed out.
 
-- Use the deployed Vercel URL.
-- Record at 1440 × 900 or 1920 × 1080.
-- Browser zoom: 90–100%.
-- Start at the top of the page with the seeded rNVDA scenario.
-- Keep the cursor still unless it is pointing or clicking.
+## Rehearsal
 
-## Script
+1. Open https://veyraa-rust.vercel.app/ and wait for the initial market request to finish.
+2. Click **Research** in the top navigation, then **Reset demo**. This selects the fixed illustrative rNVDA scenario.
+3. Keep the default question, event packet, Buy-side and 8,000 USDT. Keep AI review off unless a real model is successfully configured and tested.
+4. Click **Run ClosePrint**, inspect the brief, **Book math**, **Provenance**, and **Download run**.
+5. Change Size (USDT) to 1,000 and run again. The effect is a smaller modeled fill cost, not evidence of profitability.
+6. Reset again before the actual recording.
 
-### 0:00–0:10 — Problem
+## Click-by-click voice-over (about 110–140 seconds)
 
-“US stocks close, but rTokens can keep trading. That means the price on Saturday and the price discovered at Monday's cash open are not the same object. This is Veyra.”
+| Time | Click / screen action | Say |
+|---|---|---|
+| 0–15s | Top of page; show the workflow. Briefly drag Event packet, then stop. | “This is Veyra, a read-only research desk for Bitget rToken traders. A token quote can keep moving while US cash is closed. The question is what evidence and liquidity support your decision.” |
+| 15–30s | Click Research, then Reset demo. Point to Illustrative label. | “I’m using a clearly labelled illustrative rNVDA event and book, so this walkthrough is reproducible. This is not an observed earnings report or a live trading result.” |
+| 30–45s | Show Question, Event packet, Buy-side and Size 8000. | “The task is whether an eight-thousand-dollar position is supported by the supplied event evidence and visible liquidity. The question provides context; in rule mode, these asset, side and size controls drive the calculations.” |
+| 45–65s | Click Run ClosePrint. Show Event read and Two market clocks. | “The rule-based event read finds both positive wording and margin pressure. It does not invent a consensus number. The desk separates the closed cash session from the token book and its venue-derived anchor.” |
+| 65–85s | Click Book math. Point to level rows and estimated average. | “Veyra walks the visible price levels to estimate the average fill and cost relative to the midpoint. This excludes fees and hidden liquidity. It is a snapshot estimate, not a promised execution price.” |
+| 85–105s | Change Size to 1000, click Run ClosePrint, revisit Book math. | “Now I reduce the research size to one thousand and run again. The fill calculation changes with the amount of book consumed. That gives the user a concrete size comparison before deciding.” |
+| 105–120s | Click Decision brief; show Anchor sensitivity. | “These lower, flat and higher anchor cases are modeled sensitivities. They are not historical probabilities or a Monday forecast.” |
+| 120–140s | Click Provenance, then Download run. | “Every layer identifies its source and limitations, and the exact run can be downloaded. The current fallback is rules-based; optional AI review is separate. Veyra organizes evidence, and the human makes the decision. No order is placed.” |
 
-Show the headline and the five-step workflow.
+## Stronger AI-track recording, only after a working model is verified
 
-### 0:10–0:24 — Research request
+Use a genuine sourced excerpt instead of the seeded packet; include the source URL and publication date in the text. Do not splice unrelated earnings facts into the illustrative narrative. Turn **AI review on** and run. Show the actual model name, answer and quoted evidence. Say: “The model answers my question using the supplied packet. Quotes are checked against that packet, but this does not verify the source externally. Book mathematics remain deterministic.”
 
-“A trader asks whether to touch rNVDA after an earnings event, supplies an $8,000 size and pastes the event packet. No account connection is required, and Veyra cannot place an order.”
+Show one full successful request. Keep waiting time or visibly label a time cut. Do not present a rules fallback, mocked provider or error state as successful AI. If the provider still fails, the baseline clip is an honest product walkthrough but the AI-specific demonstration remains incomplete.
 
-Point to the question, event packet, rNVDA and size. Click **Run ClosePrint**.
+## Before submitting
 
-### 0:24–0:45 — Actionable insight
-
-“ClosePrint produces one actionable research posture. It separates the event-language read from market evidence, so a positive headline does not automatically become a buy instruction.”
-
-Point to the posture, actionable insight and Event read.
-
-### 0:45–1:04 — Two clocks and tradability
-
-“The important Bitget-specific layer is here: US cash can be closed while the rToken book remains active. Veyra then prices the visible spread, fill ratio and estimated impact for this exact size.”
-
-Point to **Two market clocks** and **Cost of immediacy**.
-
-### 1:04–1:17 — Re-anchor and provenance
-
-“The Monday panel is a sensitivity test—not a prediction. Every figure is labelled observed, derived, modeled or illustrative.”
-
-Point to Monday sensitivity, then open **Provenance**.
-
-### 1:17–1:30 — Close
-
-“Veyra gives an rToken trader a complete question-to-insight workflow while keeping the final decision human-controlled. No login, no execution, and no invented history.”
-
-End on the human-decision message or the Run Trace section.
-
-## Recording checklist
-
-- [ ] No API error appears.
-- [ ] Source badge is visible.
-- [ ] The Run ClosePrint button is clicked once.
-- [ ] Decision brief, two clocks, book cost and provenance appear.
-- [ ] Voice-over does not claim an external runtime LLM or historical probability.
-- [ ] Export at 1080p.
+- Video under 3 minutes, publicly accessible, one question-to-insight task visible.
+- UI source labels readable; no keys, account identifiers or private tabs shown.
+- No performance claims or fake customer results.
+- Quote the official X post with the project intro, #BitgetHackathon and @Bitget_AI.
+- Put the real video/X URLs in the form. Do not paste placeholder links.

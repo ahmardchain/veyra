@@ -12,6 +12,9 @@ export type EventRead = {
 };
 
 export type ClosePrintRun = {
+  aiReview?: import("./ai-review").AIReview;
+  aiError?: string;
+  durationMs?: number;
   question: string;
   eventPacket: string;
   eventSource: "illustrative" | "user-supplied";
@@ -43,11 +46,11 @@ const NEGATIVE_SIGNALS = [
   "slower",
   "decline",
   "pressure",
-  "margin",
+  "margin pressure",
 ];
 
 function matches(text: string, terms: string[]) {
-  return terms.filter((term) => text.includes(term));
+  return terms.filter((term) => new RegExp(`\\b${term}\\b`, "i").test(text));
 }
 
 export function extractEventRead(packet: string): EventRead {
