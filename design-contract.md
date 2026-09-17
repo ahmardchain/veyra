@@ -10,7 +10,7 @@ Veyra is a public, no-login, read-only rToken research desk. ClosePrint converts
 - Audience: self-directed Bitget rToken traders and hackathon judges
 - Mode: redesign that preserves the established dark Spectrum language
 - Visual variance: 3/10
-- Motion intensity: 2/10
+- Motion intensity: 6/10 — animated workflow edges and state transitions, with pause and reduced-motion support
 - Information density: 8/10 inside the desk, 5/10 outside it
 - Asset dependence: 1/10
 - Brand fidelity: 9/10
@@ -26,7 +26,7 @@ Veyra is a public, no-login, read-only rToken research desk. ClosePrint converts
 
 ## UX hierarchy
 
-1. Understand the Monday re-anchor problem.
+1. Inspect the interactive research workflow and Run brief action together in the first viewport.
 2. Review or edit the research request.
 3. Run ClosePrint.
 4. Read the actionable insight.
@@ -48,3 +48,5 @@ No external runtime LLM is active in the current public build. Do not show a Qwe
 ## Components
 
 Use Spectrum UI Agent Steps and Floating Label Input plus the existing shadcn-compatible Button, Card, Tabs, Table and Textarea primitives. Do not recreate common controls.
+
+React Flow supplies the requested draggable graph, handles, curved edges, zoom and keyboard selection. Custom nodes represent actual deterministic product stages, not fictional AI calls. The graph is an inspectable workflow, not a rewiring/execution editor. No hackathon positioning appears in the public interface. Veyra's monochrome branching V favicon matches the header mark.

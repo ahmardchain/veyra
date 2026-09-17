@@ -1,19 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { WorkflowGraph } from "@/components/workflow-graph";
 import {
   ArrowRight,
-  BarChart3,
-  BookOpen,
   Check,
   CheckCircle2,
-  ChevronRight,
   CircleDot,
-  Clock3,
-  Database,
-  FileSearch,
-  FlaskConical,
-  Gauge,
   RefreshCw,
   ScanSearch,
   ShieldCheck,
@@ -57,6 +51,7 @@ function makeRun(snapshot: MarketSnapshot, question = SEEDED_QUESTION, eventPack
 }
 
 export default function Desk() {
+  const reducedMotion = useReducedMotion();
   const [symbol, setSymbol] = useState("RNVDAUSDT");
   const [side, setSide] = useState<Side>("buy");
   const [notional, setNotional] = useState("8000");
@@ -69,7 +64,7 @@ export default function Desk() {
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const [tab, setTab] = useState("brief");
 
-  async function loadMarket(nextSymbol = symbol, updateRun = false) {
+  async function loadMarket(nextSymbol = symbol) {
     setLoading(true);
     setMarketError("");
     try {
@@ -77,11 +72,11 @@ export default function Desk() {
       const data = await response.json();
       if (!response.ok) throw new Error("Live market data unavailable.");
       setSnapshot(data);
-      if (updateRun) setRun(makeRun(data, question, eventPacket, side, Number(notional)));
+      
     } catch {
       const fallback = illustrativeSnapshots[nextSymbol];
       setSnapshot(fallback);
-      if (updateRun) setRun(makeRun(fallback, question, eventPacket, side, Number(notional)));
+      
       setMarketError("Live Bitget data is unavailable. Veyra switched to its clearly labelled illustrative book.");
     } finally {
       setLoading(false);
@@ -167,20 +162,21 @@ export default function Desk() {
     <div className="desk-shell">
       <a className="skip-link" href="#workbench">Skip to workbench</a>
       <header className="topbar">
-        <a className="wordmark" href="#top" aria-label="Veyra home">veyra<span>/</span></a>
+        <a className="wordmark" href="#top" aria-label="Veyra home"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 8l10 18L26 8M16 26V15" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>veyra<span>/</span></a>
         <span className="top-divider" />
         <span className="top-label">CLOSEPRINT DESK</span>
-        <nav className="top-nav" aria-label="Primary navigation"><a href="#workbench">Desk</a><a href="#method">Method</a><a href="#about">About</a></nav>
-        <div className="top-right"><span className="demo-tag"><FlaskConical size={14} />Public demo</span><span className="read-only"><ShieldCheck size={14} />No execution</span></div>
+        <nav className="top-nav" aria-label="Primary navigation"><a href="#workflow">Workflow</a><a href="#workbench">Research</a></nav>
+        <div className="top-right"><span className="read-only"><ShieldCheck size={14} />Read-only desk</span></div>
       </header>
 
       <main id="top">
-        <section className="hero" aria-labelledby="page-title">
-          <div className="hero-copy"><p className="eyebrow">AI TRADING DESK / INFORMATION EXTRACTION &amp; SIGNAL GENERATION</p><h1 id="page-title">What survives the Monday re-anchor?</h1><p>Veyra turns an after-hours event into a session-aware rToken research brief—then shows what the current book already reflects.</p></div>
-          <div className="hero-state" aria-label="Product status"><div><span>Mode</span><strong>Research only</strong></div><div><span>Decision</span><strong>Human controlled</strong></div><div><span>Execution</span><strong>Disabled</strong></div></div>
+        <section className="workflow-section" id="workflow" aria-labelledby="page-title">
+          <div className="workflow-toolbar">
+            <div><p className="eyebrow">VEYRA / RESEARCH WORKFLOW</p><h1 id="page-title">From event to informed decision.</h1></div>
+            <div className="workflow-actions"><span role="status">{analysisRunning ? "Recalculating brief…" : draftChanged ? "Inputs changed · run to update" : "Brief ready to inspect"}</span><motion.div whileTap={reducedMotion ? {} : { scale: .96 }}><Button className="run-button" onClick={runClosePrint} disabled={inputError || loading || analysisRunning || !question.trim() || !eventPacket.trim()}>{analysisRunning ? <RefreshCw size={16} className="spin" /> : <ArrowRight size={16} />}{analysisRunning ? "Building brief…" : "Run brief"}</Button></motion.div></div>
+          </div>
+          <WorkflowGraph run={run} running={analysisRunning} />
         </section>
-
-        <div className="flow-strip" aria-label="ClosePrint workflow"><span><b>01</b> Event</span><ChevronRight aria-hidden="true" /><span><b>02</b> Expectation gap</span><ChevronRight aria-hidden="true" /><span><b>03</b> Two clocks</span><ChevronRight aria-hidden="true" /><span><b>04</b> Book cost</span><ChevronRight aria-hidden="true" /><span><b>05</b> Insight</span></div>
 
         <section className="workbench" id="workbench" aria-label="Veyra ClosePrint workbench">
           <Card className="input-panel">
@@ -188,7 +184,7 @@ export default function Desk() {
             <div className="input-body">
               <div className="field-group"><label className="field-label" htmlFor="research-question">Question</label><Textarea id="research-question" value={question} onChange={(eventValue) => setQuestion(eventValue.target.value)} rows={3} /></div>
               <div className="field-group"><div className="field-line"><label className="field-label" htmlFor="event-packet">Event packet</label><span>{eventPacket.trim() === SEEDED_EVENT ? "Illustrative" : "User supplied"}</span></div><Textarea id="event-packet" value={eventPacket} onChange={(eventValue) => setEventPacket(eventValue.target.value)} rows={5} /><p className="hint">Paste a sourced earnings or news summary. The demo packet is illustrative and never presented as observed evidence.</p></div>
-              <div className="field-group"><div className="field-line"><span className="field-label">rToken</span><span>Bitget spot</span></div><div className="asset-grid">{assets.map((item) => <Button key={item.symbol} variant={symbol === item.symbol ? "default" : "outline"} onClick={() => { setSymbol(item.symbol); void loadMarket(item.symbol, true); }}>{item.label}</Button>)}</div></div>
+              <div className="field-group"><div className="field-line"><span className="field-label">rToken</span><span>Bitget spot</span></div><div className="asset-grid">{assets.map((item) => <Button key={item.symbol} variant={symbol === item.symbol ? "default" : "outline"} onClick={() => { setSymbol(item.symbol); void loadMarket(item.symbol); }}>{item.label}</Button>)}</div></div>
               <div className="trade-row"><div><span className="field-label">Research side</span><div className="side-grid"><Button variant={side === "buy" ? "default" : "outline"} onClick={() => setSide("buy")}>Buy-side</Button><Button variant={side === "sell" ? "default" : "outline"} onClick={() => setSide("sell")}>Sell-side</Button></div></div><div className="size-input"><FloatingLabelInput id="order-size" label="Size (USDT)" type="number" min={1} max={1000000} step="any" value={notional} onChange={(eventValue) => setNotional(eventValue.target.value)} /></div></div>
               {inputError ? <p className="error" role="alert">Use a size from 1 to 1,000,000 USDT.</p> : null}
               {!question.trim() || !eventPacket.trim() ? <p className="error" role="alert">Question and event packet are required.</p> : null}
@@ -197,7 +193,7 @@ export default function Desk() {
             </div>
           </Card>
 
-          <div className="result-panel" aria-live="polite">
+          <motion.div className="result-panel" aria-live="polite" initial={false} animate={{ opacity: analysisRunning ? .55 : 1, y: analysisRunning && !reducedMotion ? 4 : 0 }} transition={{ duration: reducedMotion ? 0 : .22 }}>
             <div className="result-commandbar"><div><span className={`source-pill ${run.snapshot.source}`}>{run.snapshot.source === "live" ? "LIVE BITGET" : "ILLUSTRATIVE BOOK"}</span><span className="timestamp">Snapshot {time(run.snapshot.timestamp)}</span></div><Button variant="outline" size="sm" onClick={() => loadMarket(symbol)} disabled={loading}><RefreshCw size={13} className={loading ? "spin" : ""} />{loading ? "Refreshing" : "Refresh"}</Button></div>
             {marketError ? <p className="stale-note" role="status">{marketError}</p> : null}
             <Tabs value={tab} onValueChange={setTab}>
@@ -219,20 +215,13 @@ export default function Desk() {
               <TabsContent value="book"><Card className="book-card"><div className="book-summary"><div><span>Requested</span><strong>{money(run.notional)} USDT</strong></div><div><span>Estimated average</span><strong>{money(market.averageFill)}</strong></div><div><span>Visible book cost</span><strong>{money(market.estimatedBookCost)} USDT</strong></div></div><div className="table-wrap"><Table><TableHeader><TableRow><TableHead>Level</TableHead><TableHead className="numeric">Price</TableHead><TableHead className="numeric">Quantity used</TableHead><TableHead className="numeric">Notional</TableHead></TableRow></TableHeader><TableBody>{market.fills.map((fill, index) => <TableRow key={`${fill.price}-${index}`}><TableCell className="muted">{String(index + 1).padStart(2, "0")}</TableCell><TableCell className="numeric">{money(fill.price)}</TableCell><TableCell className="numeric">{money(fill.quantity, 4)}</TableCell><TableCell className="numeric">{money(fill.notional)}</TableCell></TableRow>)}</TableBody></Table></div></Card></TabsContent>
               <TabsContent value="evidence"><Card className="evidence-card"><p className="eyebrow">PROVENANCE / BOUNDARIES</p><h2>Every number says what it is.</h2><dl><dt>Event layer <span>{run.eventSource}</span></dt><dd>{run.eventSource === "illustrative" ? "A seeded demonstration packet. Replace it with a primary-source excerpt before making a live claim." : "Text supplied by the user. Deterministic keyword extraction identifies language; it does not verify the source."}</dd><dt>Market layer <span>{run.snapshot.source}</span></dt><dd>{run.snapshot.source === "live" ? `Public Bitget v3 ticker and visible order book for ${run.snapshot.symbol}, timestamped ${time(run.snapshot.timestamp)}.` : "A fixed illustrative fallback book used only when the public Bitget request is unavailable."}</dd><dt>Anchor layer <span>derived</span></dt><dd>The close of the latest completed 3–4 PM New York hourly rToken candle: {money(run.snapshot.anchor)} at {time(run.snapshot.anchorTimestamp)}. It is a venue anchor, not an official underlying-stock close.</dd><dt>Scenario layer <span>modeled</span></dt><dd>−3%, 0%, and +3% sensitivity around the venue anchor. These are not historical observations, probabilities, or price forecasts.</dd><dt>Current limitations <span>excluded</span></dt><dd>No external LLM, transcript verification, historical analogue database, account balances, hidden liquidity, fees, taxes, issuer redemption, or execution.</dd></dl></Card></TabsContent>
             </Tabs>
-          </div>
+          </motion.div>
         </section>
 
-        <section className="trace-section" aria-labelledby="trace-title">
+        <details className="trace-section"><summary>Inspect calculation trace</summary><div className="trace-layout">
           <div className="section-intro"><p className="eyebrow">AUDITABLE RESEARCH RUN</p><h2 id="trace-title">One question. Five visible checks.</h2><p>The workflow stays inspectable: inputs, source status, calculations, boundaries and conclusion remain separate.</p></div>
           <Card className="trace-card"><div className="trace-head"><span><ScanSearch size={16} />Run trace</span><span className="source-pill rules">RULE ENGINE</span></div><div className="trace-body"><AgentSteps steps={trace} /></div><div className="trace-foot"><CheckCircle2 size={15} /><span>Research object completed</span><small>No external model call required</small></div></Card>
-        </section>
-
-        <section className="method-section" id="method" aria-labelledby="method-title">
-          <div className="section-intro"><p className="eyebrow">WHY VEYRA EXISTS</p><h2 id="method-title">The weekend print and Monday fair value are different objects.</h2><p>Veyra is built for self-directed Bitget rToken traders who need to decide whether immediacy is worth its cost while the reference cash market is closed.</p></div>
-          <div className="method-grid"><article><Clock3 /><span>01 / SESSION</span><h3>Separate the clocks</h3><p>The live rToken venue book is never presented as a live Nasdaq or NYSE price.</p></article><article><Gauge /><span>02 / TRADABILITY</span><h3>Price the visible book</h3><p>Spread, depth, fill ratio and modeled impact are calculated for the trader&apos;s requested size.</p></article><article><FileSearch /><span>03 / EVENT</span><h3>Expose the gap</h3><p>The event read separates headline language, expectation evidence and the counter-signal.</p></article><article><ShieldCheck /><span>04 / CONTROL</span><h3>Keep the human gate</h3><p>Veyra ends with an actionable research posture, never an autonomous order.</p></article></div>
-        </section>
-
-        <section className="about-section" id="about" aria-labelledby="about-title"><div><p className="eyebrow">HACKATHON BUILD</p><h2 id="about-title">Purpose-built for the rToken session gap.</h2></div><div className="about-facts"><div><Database /><span>Data</span><strong>Bitget public market API</strong></div><div><BarChart3 /><span>Track</span><strong>AI Trading Desk</strong></div><div><BookOpen /><span>Theme</span><strong>Information Extraction &amp; Signal Generation</strong></div><div><ShieldCheck /><span>Safety</span><strong>Read-only, no login, no execution</strong></div></div></section>
+        </div></details>
 
         <footer><span>VEYRA / CLOSEPRINT DESK</span><span>Observed · derived · modeled · illustrative</span><span>No login. No execution.</span></footer>
       </main>
