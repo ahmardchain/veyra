@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Veyra — rToken Immediacy Desk",
-  description: "A read-only agent desk that prices the cost of trading rTokens while the US cash market is closed.",
+  title: "Veyra ClosePrint — Session-aware rToken research",
+  description: "An AI Trading Desk that turns after-hours events into a session-aware Monday re-anchor brief for rToken traders.",
   other: {
     "codex-preview": "development",
   },

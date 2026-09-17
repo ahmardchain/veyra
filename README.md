@@ -1,6 +1,6 @@
 # Veyra
 
-A no-login, read-only Bitget rToken cost-of-immediacy demo for the AI Trading Desk track. Compare the estimated cost of trading now with explicitly labeled waiting scenarios; inspect the execution math and evidence. No orders are placed.
+A no-login, read-only Bitget rToken research demo for the **AI Trading Desk → Information Extraction & Signal Generation** sub-theme. Veyra ClosePrint turns an after-hours event into a structured memo covering the expectation gap, two market clocks, weekend tradability, modeled re-anchor scenarios, and invalidation evidence. The human makes the final decision; no orders are placed.
 
 ## Demo status
 
