@@ -1,13 +1,50 @@
-# Veyra — workflow-first technical demo
+# Veyra — design contract
 
-User-approved overhaul: Spectrum UI default dark palette supersedes cobalt, plush surfaces and consumer branding. No login, marketing cover, sidebar workshop, or invented agent activity.
+## Product
 
-Design read: technical agent desk for hackathon visitors; variance 3, motion 2, density 8, asset dependence 1, Spectrum fidelity 9. Desktop three-column working surface; mobile stacked controls, result, trace. Geist Sans and Geist Mono. 12px panel corners, existing component control radii, 8px-based spacing, restrained transitions and reduced-motion support.
+Veyra is a public, no-login, read-only rToken research desk. ClosePrint converts an after-hours event and requested trade size into a provenance-labelled research brief. The interface must never resemble a broker order ticket or imply autonomous execution.
 
-Spectrum public dark theme: background hsl(0 0% 3.9%); text and primary hsl(0 0% 98%); border, secondary and muted hsl(0 0% 14.9%); secondary text hsl(0 0% 63.9%). No cobalt overrides. Red/green indicate calculated movement only.
+## Design read
 
-Use Spectrum Agent Steps and Floating Label Input. Existing shadcn Button/Card/Slider/Tabs/Table/Textarea are the same primitive family used by Spectrum; their official source was inspected before composition. See SPECTRUM-SOURCES.md.
+- Artifact: technical research workbench with concise product context
+- Audience: self-directed Bitget rToken traders and hackathon judges
+- Mode: redesign that preserves the established dark Spectrum language
+- Visual variance: 3/10
+- Motion intensity: 2/10
+- Information density: 8/10 inside the desk, 5/10 outside it
+- Asset dependence: 1/10
+- Brand fidelity: 9/10
 
-Flow: editable sample holdings and assumed shocks → deterministic position P&L → counterfactual exposure reduction retaining proceeds as cash → calculation evidence. Qwen remains visibly disconnected; no note parsing, remote requests, account data, execution or live prices. Sample values are explicitly hypothetical. Only unleveraged long spot arithmetic, excluding costs, margin and liquidation. Input validation and stale-result disclosure required.
+## System
 
-Veyra is the user's selected working name; availability not verified. Existing source revisions retained in git.
+- Palette: Spectrum dark neutrals; blue only for workflow focus; green, red and amber only for market/state meaning
+- Typography: Geist Sans for interface and narrative; Geist Mono for provenance, states and measurements
+- Spacing: 8px base with 10–24px component spacing and 48–92px section rhythm
+- Radius: 7–12px controls and surfaces; pills only for compact statuses
+- Elevation: borders and tonal surfaces, no decorative shadows or gradients
+- Motion: 150–420ms state feedback; reduced-motion support
+
+## UX hierarchy
+
+1. Understand the Monday re-anchor problem.
+2. Review or edit the research request.
+3. Run ClosePrint.
+4. Read the actionable insight.
+5. Inspect event, session, book and sensitivity evidence.
+6. Verify provenance and limitations.
+
+Draft input must not silently rewrite a completed brief. The UI shows when a draft has changed and requires an explicit rerun.
+
+## Data-language contract
+
+- `live`: returned by the public Bitget market endpoint
+- `illustrative`: fixed demonstration fixture
+- `user-supplied`: text entered by the visitor
+- `derived`: deterministic calculation from a stated input
+- `modeled`: explicit sensitivity case, not an observation or forecast
+
+No external runtime LLM is active in the current public build. Do not show a Qwen control, loading state or provider error. Event-language extraction is deterministic and must be described as such.
+
+## Components
+
+Use Spectrum UI Agent Steps and Floating Label Input plus the existing shadcn-compatible Button, Card, Tabs, Table and Textarea primitives. Do not recreate common controls.
