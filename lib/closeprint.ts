@@ -64,9 +64,13 @@ export function extractEventRead(packet: string): EventRead {
 
   const positive = matches(normalized, POSITIVE_SIGNALS);
   const negative = matches(normalized, NEGATIVE_SIGNALS);
-  const tone: EventTone =
-    positive.length > negative.length ? "positive" :
-      negative.length > positive.length ? "negative" : "mixed";
+  const tone: EventTone = positive.length > 0 && negative.length > 0
+    ? "mixed"
+    : positive.length > 0
+      ? "positive"
+      : negative.length > 0
+        ? "negative"
+        : "mixed";
 
   const headline =
     tone === "positive" ? "The supplied event text has a positive headline skew." :
